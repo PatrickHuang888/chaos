@@ -12,6 +12,10 @@ or using a nemesis to disturb the whole cluster.
 
 ![Architecture](./chaos.jpg)
 
+
+modified to add a node name pd for pd, modified to control service on every node,
+modified to no password ssh to nodes from chaos-control, all focus on docker-compose 
+
 ## Usage
 
 In one shell, we start the 5 nodes and the controller.
@@ -23,18 +27,18 @@ cd docker
 
 In another shell, use `docker exec -it chaos-control bash` to enter the controller, then:
 
-```
-# build the node and your own chaos test
-make
-
-# deploy and start node agent
-./scripts/deploy_agent.sh
+```console
+#start agent
 ./scripts/start_agent.sh
-
-# run you own chaos like
-./bin/chaos-tidb
+# setup db software on nodes
+/root/chaos-control -action setupdb
+# start pd on node pd
+/root/chaos-control -action startpd
+# start kv on node 1, can be 1,2,3,4,5
+/root/chaos-control -action startkv -node 1
+# start tidb on node 4
+/root/chaos-control -action starttidb -node 4
 ```
 
-## Scaffold
 
-It is very easy to write your own chaos test. TODO...
+

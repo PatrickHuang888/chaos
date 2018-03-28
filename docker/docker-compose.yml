@@ -12,11 +12,16 @@ services:
       - n3
       - n4
       - n5
+      - pd
   node:
     container_name: chaos-node
     build: ./node
     env_file: ./secret/node.env
     privileged: true
+  pd:
+    extends: node
+    container_name: chaos-pd
+    hostname: pd
   n1:
     extends: node
     container_name: chaos-n1

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"log"
 )
 
 // IsFileExist returns true if the file exists.
@@ -57,11 +58,13 @@ func Wget(ctx context.Context, rawURL string, dest string) (string, error) {
 func InstallArchive(ctx context.Context, rawURL string, dest string) error {
 	err := os.MkdirAll("/tmp/chaos", 0755)
 	if err != nil {
+		log.Fatalf("Make '/tmp/chaos' error %v", err)
 		return err
 	}
 
 	var tmpDir string
 	if tmpDir, err = ioutil.TempDir("/tmp/chaos", "archive_"); err != nil {
+		log.Fatalf("Make '/tmp/archive_chaos' error %v", err)
 		return err
 	}
 
@@ -69,7 +72,7 @@ func InstallArchive(ctx context.Context, rawURL string, dest string) error {
 
 	var name string
 	if strings.HasPrefix(rawURL, "file://") {
-		name = strings.Trim(rawURL, "file://")
+		name = strings.TrimPrefix(rawURL, "file://")
 	} else {
 		if name, err = Wget(ctx, rawURL, "/tmp/chaos"); err != nil {
 			return err
@@ -83,6 +86,7 @@ func InstallArchive(ctx context.Context, rawURL string, dest string) error {
 	}
 
 	if err != nil {
+		log.Fatalf("Extract file error %v", err)
 		return err
 	}
 
@@ -129,6 +133,10 @@ func StartDaemon(ctx context.Context, opts DaemonOptions, cmd string, cmdArgs ..
 
 	args = append(args, "--pidfile", opts.PidFile)
 	args = append(args, "--chdir", opts.ChDir)
+
+	//-o, --oknodo  Return exit status 0 instead of 1 if no actions are (would be) taken.
+	//-a, --startas pathname  With --start, start the process specified by pathname.
+	// 							If not specified, defaults to the argument given to --exec.
 	args = append(args, "--oknodo", "--startas", cmd)
 	args = append(args, "--")
 	args = append(args, cmdArgs...)

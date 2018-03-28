@@ -82,6 +82,7 @@ func (agent *Agent) createRouter() *mux.Router {
 
 	dbHandler := newDBHanlder(agent, rd)
 	router.HandleFunc("/db/{name}/setup", dbHandler.SetUp).Methods("POST")
+	router.HandleFunc("/db/{name}/start", dbHandler.Start).Methods("POST")
 	router.HandleFunc("/db/{name}/teardown", dbHandler.TearDown).Methods("POST")
 
 	return router

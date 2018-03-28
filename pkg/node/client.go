@@ -76,6 +76,24 @@ func (c *Client) TearDownDB(name string, nodes []string) error {
 	return c.doPost(fmt.Sprintf("/db/%s/teardown", name), v, nil)
 }
 
+func (c *Client) StartPD(name string) error  {
+	v := url.Values{}
+	v.Set("service", "pd")
+	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
+}
+
+func (c *Client) StartKV(name string) error  {
+	v := url.Values{}
+	v.Set("service", "tikv")
+	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
+}
+
+func (c *Client) StartTiDB(name string) error{
+	v := url.Values{}
+	v.Set("service", "tidb")
+	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
+}
+
 // StartDB starts db
 func (c *Client) StartDB(name string) error {
 	return c.doPost(fmt.Sprintf("/db/%s/start", name), nil, nil)

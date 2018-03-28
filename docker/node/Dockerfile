@@ -16,7 +16,8 @@ ADD http://hxm-server/tidb-v1.0.8-linux-amd64.tar.gz /root
 
 ADD ./chaos-agent /root/chaos-agent
 
-RUN go get -u github.com/derekparker/delve/cmd/dlv
+#debug
+# RUN go get -u github.com/derekparker/delve/cmd/dlv
 
 
 RUN mkdir /var/run/sshd

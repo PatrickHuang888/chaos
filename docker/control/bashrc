@@ -7,7 +7,6 @@ This container runs the Chaos tests in sub-containers.
 You are currently in the base dir of the git repo for Chaos.
 
 To run a test:
-   ./script/deploy_agent.sh
    ./script/start_agent.sh
    /root/chaos-control
 EOF

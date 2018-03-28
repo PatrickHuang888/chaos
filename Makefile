@@ -8,7 +8,8 @@ agent:
 	go build -o bin/chaos-agent cmd/agent/main.go
 
 chaos:
-	go build -o bin/chaos-tidb cmd/tidb/main.go
+	#go build -o bin/chaos-tidb cmd/tidb/main.go
+	go build -o bin/chaos-control cmd/tidb/main.go
 
 update:
 	which glide >/dev/null || curl https://glide.sh/get | sh

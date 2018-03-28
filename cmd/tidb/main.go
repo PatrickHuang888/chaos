@@ -15,9 +15,13 @@ import (
 	"github.com/siddontang/chaos/pkg/history"
 	"github.com/siddontang/chaos/pkg/nemesis"
 	"github.com/siddontang/chaos/tidb"
+	"fmt"
 )
 
 var (
+	action = flag.String("action", "run", "action:run, setupdb, "+
+		"startpd, startkv, starttidb, setupclient, teardowndb, teardownclient")
+	node         = flag.Int("node", -1, "node: 1,2,3,4, 5")
 	nodePort     = flag.Int("node-port", 8080, "node port")
 	requestCount = flag.Int("request-count", 500, "client test request count")
 	runTime      = flag.Duration("run-time", 10*time.Minute, "client test run time")
@@ -83,23 +87,50 @@ func main() {
 		cancel()
 	}()
 
-	c.Run()
-
-	// Verify may take a long time, we should quit ASAP if receive signal.
-	go func() {
-		ok, err := verifier.Verify(*historyFile)
-		if err != nil {
-			log.Fatalf("verify history failed %v", err)
-		}
-
-		if !ok {
-			log.Fatalf("%s history %s is not linearizable", *clientCase, *historyFile)
-		} else {
-			log.Printf("%s history %s is linearizable", *clientCase, *historyFile)
-		}
-
+	switch *action {
+	case "setupdb":
+		c.SetupDB()
 		cancel()
-	}()
+	case "startpd":
+		c.StartPD()
+		cancel()
+	case "startkv":
+		//TODO: node number handling
+		c.StartKV(*node)
+		cancel()
+	case "starttidb":
+		//TODO: node number handling
+		c.StartTiDB(*node)
+		cancel()
+	case "setupclient":
+		c.SetUpClient()
+	case "teardowndb":
+		c.TearDownDB()
+	case "teardownclient":
+		c.TearDownClient()
+	case "run":
+		c.Run()
 
+		// Verify may take a long time, we should quit ASAP if receive signal.
+		go func() {
+			ok, err := verifier.Verify(*historyFile)
+			if err != nil {
+				log.Fatalf("verify history failed %v", err)
+			}
+
+			if !ok {
+				log.Fatalf("%s history %s is not linearizable", *clientCase, *historyFile)
+			} else {
+				log.Printf("%s history %s is linearizable", *clientCase, *historyFile)
+			}
+
+			cancel()
+		}()
+
+	default:
+		panic("unrecognized control action")
+	}
+
+	fmt.Println("Done")
 	<-ctx.Done()
 }
