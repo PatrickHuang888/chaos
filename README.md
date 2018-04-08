@@ -28,7 +28,7 @@ cd docker
 In another shell, use `docker exec -it chaos-control bash` to enter the controller, then:
 
 ```console
-#start agent
+# start agent
 ./scripts/start_agent.sh
 # setup db software on nodes
 /root/chaos-control -action setupdb
@@ -38,7 +38,7 @@ In another shell, use `docker exec -it chaos-control bash` to enter the controll
 /root/chaos-control -action startkv -nodes 1,2,3
 # start tidb on node 4
 /root/chaos-control -action starttidb -nodes 4
-#init tables and run, then linearization checking
+# init tables and run, then linearization checking
 /root/chaos-control -action run -nodes 4 -initData
 ```
 
