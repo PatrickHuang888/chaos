@@ -13,13 +13,9 @@ type RequestGenerator interface {
 // Client is used in contorl.
 // You should define your own client for your database.
 type Client interface {
-	// SetUp sets up the client.
-	SetUp(ctx context.Context, nodes []string, node string) error
-	// TearDown tears down the client.
-	TearDown(ctx context.Context, nodes []string, node string) error
-	// Invoke invokes a request to the database.
+	Setup(ctx context.Context, node string, initData bool) error
+	Close(ctx context.Context, nodes []string, node string) error
 	Invoke(ctx context.Context, node string, r interface{}) interface{}
-	// NextRequest generates a request for latter Invoke.
 	NextRequest() interface{}
 }
 
@@ -44,10 +40,10 @@ type noopClient struct {
 }
 
 // SetUp sets up the client.
-func (noopClient) SetUp(ctx context.Context, nodes []string, node string) error { return nil }
+func (noopClient) Setup(ctx context.Context, node string, initData bool) error { return nil }
 
 // TearDown tears down the client.
-func (noopClient) TearDown(ctx context.Context, nodes []string, node string) error { return nil }
+func (noopClient) Close(ctx context.Context, nodes []string, node string) error { return nil }
 
 // Invoke invokes a request to the database.
 func (noopClient) Invoke(ctx context.Context, node string, r interface{}) interface{} {

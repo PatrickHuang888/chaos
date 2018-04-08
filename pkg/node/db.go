@@ -65,7 +65,7 @@ func (h *dbHandler) Start(w http.ResponseWriter, r *http.Request) {
 
 	service := r.FormValue("service")
 
-	node:=db.Node()
+	node := db.Node()
 	log.Printf("start service %s on node %s", service, node)
 	if err := db.Start(h.agent.ctx, service); err != nil {
 		log.Panicf("start service %s failed on %s with %v", service, node, err)
@@ -88,10 +88,33 @@ func (h *dbHandler) TearDown(w http.ResponseWriter, r *http.Request) {
 
 	//node := r.FormValue("node")
 	//nodes := strings.Split(r.FormValue("nodes"), ",")
-
-	log.Printf("tear down db %s on node %s", db.Name(), db.Node())
+	node := db.Node()
+	log.Printf("tear down db %s on node %s", node)
 	if err := db.TearDown(h.agent.ctx); err != nil {
-		log.Panicf("tear down db %s failed %v", db.Name(), err)
+		log.Panicf("tear down db %s failed %v", node, err)
+		h.rd.JSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.rd.JSON(w, http.StatusOK, nil)
+}
+
+func (h *dbHandler) Kill(w http.ResponseWriter, r *http.Request) {
+	h.agent.dbLock.Lock()
+	defer h.agent.dbLock.Unlock()
+
+	vars := mux.Vars(r)
+	db := h.getDB(w, vars)
+	if db == nil {
+		return
+	}
+
+	node := db.Node()
+	service := r.FormValue("service")
+
+	log.Printf("kill service %s on node %s", service, node)
+	if err := db.Kill(h.agent.ctx, service); err != nil {
+		log.Panicf("kill service %s failed %v", service, err)
 		h.rd.JSON(w, http.StatusInternalServerError, err.Error())
 		return
 	}

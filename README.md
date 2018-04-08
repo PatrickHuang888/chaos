@@ -35,9 +35,11 @@ In another shell, use `docker exec -it chaos-control bash` to enter the controll
 # start pd on node pd
 /root/chaos-control -action startpd
 # start kv on node 1, can be 1,2,3,4,5
-/root/chaos-control -action startkv -node 1
+/root/chaos-control -action startkv -nodes 1,2,3
 # start tidb on node 4
-/root/chaos-control -action starttidb -node 4
+/root/chaos-control -action starttidb -nodes 4
+#init tables and run, then linearization checking
+/root/chaos-control -action run -nodes 4 -initData
 ```
 
 

@@ -23,7 +23,7 @@ type bankClient struct {
 	accountNum int
 }
 
-func (c *bankClient) SetUp(ctx context.Context, nodes []string, node string) error {
+func (c *bankClient) Setup(ctx context.Context, node string, initData bool) error {
 	c.r = rand.New(rand.NewSource(time.Now().UnixNano()))
 	db, err := sql.Open("mysql", fmt.Sprintf("root@tcp(%s:4000)/test", node))
 	if err != nil {
@@ -34,28 +34,30 @@ func (c *bankClient) SetUp(ctx context.Context, nodes []string, node string) err
 	db.SetMaxIdleConns(2)
 
 	// Do SetUp in the first node
-	if node != nodes[0] {
+	/*if node != nodes[0] {
 		return nil
-	}
+	}*/
 
-	sql := `create table if not exists accounts
+	if initData {
+		sql := `create table if not exists accounts
 			(id     int not null primary key,
 			balance bigint not null)`
 
-	if _, err = db.ExecContext(ctx, sql); err != nil {
-		return err
-	}
-
-	for i := 0; i < c.accountNum; i++ {
-		if _, err = db.ExecContext(ctx, "insert into accounts values (?, 1000)", i); err != nil {
+		if _, err = db.ExecContext(ctx, sql); err != nil {
 			return err
+		}
+
+		for i := 0; i < c.accountNum; i++ {
+			if _, err = db.ExecContext(ctx, "insert into accounts values (?, 1000)", i); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (c *bankClient) TearDown(ctx context.Context, nodes []string, node string) error {
+func (c *bankClient) Close(ctx context.Context, nodes []string, node string) error {
 	return c.db.Close()
 }
 

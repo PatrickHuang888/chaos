@@ -19,6 +19,7 @@ const (
 	//archiveURL = "http://hxm-server/tidb-v1.0.8-linux-amd64.tar.gz"
 	archiveURL   = "file:///root/tidb-v1.0.8-linux-amd64.tar.gz"
 	deployDir    = "/opt/tidb"
+	SERVICE_ALL  = "all"
 	SERVICE_PD   = "pd"
 	SERVICE_TIKV = "tikv"
 	SERVICE_TIDB = "tidb"
@@ -45,7 +46,10 @@ type db struct {
 
 func init() {
 	d := new(db)
+
+	//Refactor:init
 	d.nodes = []string{"pd", "n1", "n2", "n3", "n4", "n5"}
+
 	name, err := os.Hostname()
 	if err != nil {
 		log.Fatalf("db init error, cannot get hostname %v", err)
@@ -99,7 +103,7 @@ func (db *db) SetUp(ctx context.Context) error {
 
 // TearDown tears down the database.
 func (db *db) TearDown(ctx context.Context) error {
-	return db.Kill(ctx, "ALL")
+	return db.Kill(ctx, SERVICE_ALL)
 }
 
 // Start starts the services in database
@@ -314,18 +318,33 @@ func (db *db) Stop(ctx context.Context, service string) error {
 	return nil
 }
 
-// Kill kills the database
+// Kill kills the database, default kill all
 func (db *db) Kill(ctx context.Context, service string) error {
-	if err := util.KillDaemon(ctx, tidbBinary, path.Join(deployDir, "tidb.pid")); err != nil {
-		return err
-	}
 
-	if err := util.KillDaemon(ctx, tikvBinary, path.Join(deployDir, "tikv.pid")); err != nil {
-		return err
-	}
+	switch service {
+	case SERVICE_TIDB:
+		if err := util.KillDaemon(ctx, tidbBinary, path.Join(deployDir, "tidb.pid")); err != nil {
+			return err
+		}
+	case SERVICE_TIKV:
+		if err := util.KillDaemon(ctx, tikvBinary, path.Join(deployDir, "tikv.pid")); err != nil {
+			return err
+		}
+	case SERVICE_PD:
+		if err := util.KillDaemon(ctx, pdBinary, path.Join(deployDir, "pd.pid")); err != nil {
+			return err
+		}
 
-	if err := util.KillDaemon(ctx, pdBinary, path.Join(deployDir, "pd.pid")); err != nil {
-		return err
+	default:
+		if err := util.KillDaemon(ctx, tidbBinary, path.Join(deployDir, "tidb.pid")); err != nil {
+			return err
+		}
+		if err := util.KillDaemon(ctx, tikvBinary, path.Join(deployDir, "tikv.pid")); err != nil {
+			return err
+		}
+		if err := util.KillDaemon(ctx, pdBinary, path.Join(deployDir, "pd.pid")); err != nil {
+			return err
+		}
 	}
 
 	return nil

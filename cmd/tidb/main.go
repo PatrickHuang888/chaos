@@ -9,19 +9,21 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"fmt"
+	"strconv"
 
 	"github.com/siddontang/chaos/pkg/control"
 	"github.com/siddontang/chaos/pkg/core"
 	"github.com/siddontang/chaos/pkg/history"
 	"github.com/siddontang/chaos/pkg/nemesis"
 	"github.com/siddontang/chaos/tidb"
-	"fmt"
 )
 
 var (
 	action = flag.String("action", "run", "action:run, setupdb, "+
-		"startpd, startkv, starttidb, setupclient, teardowndb, teardownclient")
-	node         = flag.Int("node", -1, "node: 1,2,3,4, 5")
+		"startpd, startkv, starttidb, startclient, shutdownclient, killkv")
+	n            = flag.String("nodes", "-1", "nodes: 1,2,3,4, 5")
+	initData     = flag.Bool("initData", false, "if init data in database")
 	nodePort     = flag.Int("node-port", 8080, "node port")
 	requestCount = flag.Int("request-count", 500, "client test request count")
 	runTime      = flag.Duration("run-time", 10*time.Minute, "client test run time")
@@ -42,7 +44,7 @@ func main() {
 	}
 
 	var (
-		creator     core.ClientCreator
+		creator core.ClientCreator
 		verifier    history.Verifier
 		nemesisGens []core.NemesisGenerator
 	)
@@ -76,6 +78,21 @@ func main() {
 
 	c := control.NewController(cfg, creator, nemesisGens)
 
+	var ns []int
+	if *n == "-1" {
+		ns = []int{}
+	} else {
+		nss := strings.Split(*n, ",")
+		ns = make([]int, len(nss))
+		for i, v := range nss {
+			if x, err := strconv.Atoi(v); err == nil {
+				ns[i] = x
+			} else {
+				panic(fmt.Sprintf("node value error %s", v))
+			}
+		}
+	}
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -89,27 +106,25 @@ func main() {
 
 	switch *action {
 	case "setupdb":
-		c.SetupDB()
+		c.SetupDBs()
 		cancel()
 	case "startpd":
 		c.StartPD()
 		cancel()
 	case "startkv":
-		//TODO: node number handling
-		c.StartKV(*node)
+		c.StartKVs(ns)
 		cancel()
 	case "starttidb":
-		//TODO: node number handling
-		c.StartTiDB(*node)
+		c.StartTiDBs(ns)
 		cancel()
-	case "setupclient":
-		c.SetUpClient()
-	case "teardowndb":
-		c.TearDownDB()
-	case "teardownclient":
-		c.TearDownClient()
+
+	case "killkv":
+		c.KillServices(ns, tidb.SERVICE_TIKV)
+		cancel()
+
 	case "run":
-		c.Run()
+		fmt.Printf("run client with initdata %v on %v\n", *initData, ns)
+		c.Run(ns, *initData)
 
 		// Verify may take a long time, we should quit ASAP if receive signal.
 		go func() {

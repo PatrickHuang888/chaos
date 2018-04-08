@@ -76,28 +76,12 @@ func (c *Client) TearDownDB(name string, nodes []string) error {
 	return c.doPost(fmt.Sprintf("/db/%s/teardown", name), v, nil)
 }
 
-func (c *Client) StartPD(name string) error  {
+func (c *Client) Start(name string, service string) error {
 	v := url.Values{}
-	v.Set("service", "pd")
+	v.Set("service", service)
 	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
 }
 
-func (c *Client) StartKV(name string) error  {
-	v := url.Values{}
-	v.Set("service", "tikv")
-	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
-}
-
-func (c *Client) StartTiDB(name string) error{
-	v := url.Values{}
-	v.Set("service", "tidb")
-	return c.doPost(fmt.Sprintf("/db/%s/start", name), v, nil)
-}
-
-// StartDB starts db
-func (c *Client) StartDB(name string) error {
-	return c.doPost(fmt.Sprintf("/db/%s/start", name), nil, nil)
-}
 
 // StopDB stops db
 func (c *Client) StopDB(name string) error {
@@ -105,7 +89,9 @@ func (c *Client) StopDB(name string) error {
 }
 
 // KillDB kills db
-func (c *Client) KillDB(name string) error {
+func (c *Client) Kill(name string, service string) error {
+	v := url.Values{}
+	v.Set("service", service)
 	return c.doPost(fmt.Sprintf("/db/%s/kill", name), nil, nil)
 }
 

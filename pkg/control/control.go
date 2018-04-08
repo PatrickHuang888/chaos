@@ -10,6 +10,7 @@ import (
 	"github.com/siddontang/chaos/pkg/core"
 	"github.com/siddontang/chaos/pkg/history"
 	"github.com/siddontang/chaos/pkg/node"
+	"github.com/siddontang/chaos/tidb"
 )
 
 // Controller controls the whole cluster. It sends request to the database,
@@ -52,13 +53,13 @@ func NewController(cfg *Config, clientCreator core.ClientCreator, nemesisGenerat
 	c.recorder = r
 	c.nemesisGenerators = nemesisGenerators
 
+	//REFACTOR: init pd and n1..n5
 	//pd client
 	name := "pd"
 	c.nodes = append(c.nodes, name)
 	client := node.NewClient(name, fmt.Sprintf("%s:%d", name, cfg.NodePort))
 	c.nodeClients = append(c.nodeClients, client)
 	c.clients = append(c.clients, clientCreator.Create(name))
-
 	//db client
 	for i := 1; i <= 5; i++ {
 		name := fmt.Sprintf("n%d", i)
@@ -77,40 +78,43 @@ func (c *Controller) Close() {
 }
 
 // Run runs the controller.
-func (c *Controller) Run() {
-	c.SetupDB()
-	c.SetUpClient()
+func (c *Controller) Run(ns []int, initData bool) {
+	//c.SetupDB()
+	c.SetupClients(ns, initData)
 
-	n := len(c.nodes)
+	n := len(ns)
 	var clientWg sync.WaitGroup
 	clientWg.Add(n)
-	for i := 0; i < n; i++ {
+	for _, i := range ns {
 		go func(i int) {
 			defer clientWg.Done()
 			c.onClientLoop(i)
 		}(i)
 	}
 
-	ctx, cancel := context.WithCancel(c.ctx)
-	var nemesisWg sync.WaitGroup
+	//_, cancel := context.WithCancel(c.ctx)
+
+	/*var nemesisWg sync.WaitGroup
 	nemesisWg.Add(1)
 	go func() {
 		defer nemesisWg.Done()
 		c.dispatchNemesis(ctx)
-	}()
+	}()*/
 
 	clientWg.Wait()
 
-	cancel()
-	nemesisWg.Wait()
+	//cancel()
 
-	c.TearDownClient()
-	c.TearDownDB()
+	//nemesisWg.Wait()
+
+	//c.ShutdownClient()
+	//c.TearDownDB()
+	c.CloseClients(ns)
 
 	c.recorder.Close()
 }
 
-func (c *Controller) syncExec(f func(i int)) {
+/*func (c *Controller) syncExec(f func(i int)) {
 	var wg sync.WaitGroup
 	n := len(c.nodes)
 	wg.Add(n)
@@ -121,7 +125,7 @@ func (c *Controller) syncExec(f func(i int)) {
 		}(i)
 	}
 	wg.Wait()
-}
+}*/
 
 /*func (c *Controller) SetUpDB(i int) {
 	if i == -1 {
@@ -131,15 +135,33 @@ func (c *Controller) syncExec(f func(i int)) {
 	}
 }*/
 
-func (c *Controller) SetupDB() {
-	log.Printf("begin to set up database")
-	c.syncExec(func(i int) {
-		client := c.nodeClients[i]
-		log.Printf("begin to set up database on %s", c.nodes[i])
-		if err := client.SetUpDB(c.cfg.DB, c.nodes); err != nil {
-			log.Fatalf("setup db %s at node %s failed %v", c.cfg.DB, c.nodes[i], err)
-		}
-	})
+func (c *Controller) syncExec(ns []int, f func(i int)) {
+	var wg sync.WaitGroup
+	n := len(ns)
+	wg.Add(n)
+	for _, i := range ns {
+		go func(i int) {
+			defer wg.Done()
+			f(i)
+		}(i)
+	}
+	wg.Wait()
+}
+
+func (c *Controller) SetupDBs() {
+	ns := make([]int, len(c.nodes))
+	for i, _ := range c.nodes {
+		ns[i] = i
+	}
+	c.syncExec(ns, c.SetupDB)
+}
+
+func (c *Controller) SetupDB(i int) {
+	client := c.nodeClients[i]
+	log.Printf("set up database on %s", c.nodes[i])
+	if err := client.SetUpDB(c.cfg.DB, c.nodes); err != nil {
+		log.Fatalf("setup db %s at node %s failed %v", c.cfg.DB, c.nodes[i], err)
+	}
 }
 
 /*func (c *Controller) StartPD(i int) {
@@ -154,67 +176,108 @@ func (c *Controller) StartPD() {
 	//pd
 	client := c.nodeClients[0]
 	log.Printf("start pd on node %s", c.nodes[0])
-	if err := client.StartPD(c.cfg.DB); err != nil {
+	if err := client.Start(c.cfg.DB, tidb.SERVICE_PD); err != nil {
 		log.Fatalf("start pd at node %s failed %v", c.nodes[0], err)
 	}
+}
+
+func (c *Controller) StartKVs(ns []int) {
+	c.syncExec(ns, c.StartKV)
 }
 
 func (c *Controller) StartKV(i int) {
 	client := c.nodeClients[i]
 	log.Printf("start kv on node %s", c.nodes[i])
-	if err := client.StartKV(c.cfg.DB); err != nil {
+	if err := client.Start(c.cfg.DB, tidb.SERVICE_TIKV); err != nil {
 		log.Fatalf("start kv at node %s failed %v", c.nodes[i], err)
 	}
 }
 
+func (c *Controller) StartTiDBs(ns []int) {
+	c.syncExec(ns, c.StartTiDB)
+}
 func (c *Controller) StartTiDB(i int) {
 	client := c.nodeClients[i]
 	log.Printf("start tidb on node %s", c.nodes[i])
-	if err := client.StartTiDB(c.cfg.DB); err != nil {
+	if err := client.Start(c.cfg.DB, tidb.SERVICE_TIDB); err != nil {
 		log.Fatalf("start tidb at node %s failed %v", c.nodes[i], err)
 	}
 }
 
-func (c *Controller) TearDownDB() {
-	log.Printf("begin to tear down database")
-	c.syncExec(func(i int) {
-		client := c.nodeClients[i]
-		log.Printf("being to tear down database on %s", c.nodes[i])
-		if err := client.TearDownDB(c.cfg.DB, c.nodes); err != nil {
-			log.Printf("tear down db %s at node %s failed %v", c.cfg.DB, c.nodes[i], err)
-		}
-	})
+func (c *Controller) SetupClients(ns []int, initData bool) {
+	var wg sync.WaitGroup
+	nl := len(ns)
+	wg.Add(nl)
+	for i, n := range ns {
+		go func(i int, n int) {
+			defer wg.Done()
+			if initData {
+				c.SetupClient(n, i == 0)
+			} else {
+				c.SetupClient(n, false)
+			}
+		}(i, n)
+	}
+	wg.Wait()
+}
+func (c *Controller) SetupClient(i int, initData bool) {
+	node := c.nodes[i]
+	dbClient := c.clients[i]
+	log.Printf("setup db client for node %s", node)
+	if err := dbClient.Setup(c.ctx, node, initData); err != nil {
+		log.Fatalf("set up db client for node %s failed %v", node, err)
+	}
+
 }
 
-func (c *Controller) SetUpClient() {
+func (c *Controller) CloseClients(ns []int) {
+	c.syncExec(ns, c.CloseClient)
+}
+func (c *Controller) CloseClient(i int) {
+	client := c.clients[i]
+	node := c.nodes[i]
+	log.Printf("shut down db client for node %s", node)
+	if err := client.Close(c.ctx, c.nodes, node); err != nil {
+		log.Printf("shut down db client for node %s failed %v", node, err)
+	}
+}
+
+func (c *Controller) KillServices(ns []int, service string) {
+	var wg sync.WaitGroup
+	n := len(ns)
+	wg.Add(n)
+	for _, i := range ns {
+		go func(i int) {
+			defer wg.Done()
+			c.Kill(i, service)
+		}(i)
+	}
+	wg.Wait()
+}
+func (c *Controller) Kill(i int, service string) {
+	client := c.nodeClients[i]
+	log.Printf("kill service %s on %s", service, c.nodes[i])
+	if err := client.Kill(c.cfg.DB, service); err != nil {
+		log.Printf("kill services %s at node %s failed %v", service, c.nodes[i], err)
+	}
+}
+
+/*func (c *Controller) SetUpClient() {
 	log.Printf("begin to set up client")
 	c.syncExec(func(i int) {
 		client := c.clients[i]
 		node := c.nodes[i]
 		log.Printf("begin to set up db client for node %s", node)
-		if err := client.SetUp(c.ctx, c.nodes, node); err != nil {
+		if err := client.Start(c.ctx, c.nodes, node); err != nil {
 			log.Fatalf("set up db client for node %s failed %v", node, err)
 		}
 	})
-}
-
-
-
-func (c *Controller) TearDownClient() {
-	log.Printf("begin to set up client")
-	c.syncExec(func(i int) {
-		client := c.clients[i]
-		node := c.nodes[i]
-		log.Printf("begin to tear down db client for node %s", node)
-		if err := client.TearDown(c.ctx, c.nodes, node); err != nil {
-			log.Printf("tear down db client for node %s failed %v", node, err)
-		}
-	})
-}
+}*/
 
 func (c *Controller) onClientLoop(i int) {
 	client := c.clients[i]
 	node := c.nodes[i]
+	log.Printf("client %v running", i)
 
 	ctx, cancel := context.WithTimeout(c.ctx, c.cfg.RunTime)
 	defer cancel()
