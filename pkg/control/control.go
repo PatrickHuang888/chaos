@@ -11,6 +11,7 @@ import (
 	"github.com/siddontang/chaos/pkg/history"
 	"github.com/siddontang/chaos/pkg/node"
 	"github.com/siddontang/chaos/tidb"
+	"time"
 )
 
 // Controller controls the whole cluster. It sends request to the database,
@@ -53,8 +54,6 @@ func NewController(cfg *Config, clientCreator core.ClientCreator, nemesisGenerat
 	c.recorder = r
 	c.nemesisGenerators = nemesisGenerators
 
-	//REFACTOR: init pd and n1..n5
-	//pd client
 	name := "pd"
 	c.nodes = append(c.nodes, name)
 	client := node.NewClient(name, fmt.Sprintf("%s:%d", name, cfg.NodePort))
@@ -78,7 +77,7 @@ func (c *Controller) Close() {
 }
 
 // Run runs the controller.
-func (c *Controller) Run(ns []int, initData bool) {
+func (c *Controller) Run(ns []int, initData bool, nemesisNodes []int) {
 	//c.SetupDB()
 	c.SetupClients(ns, initData)
 
@@ -92,20 +91,22 @@ func (c *Controller) Run(ns []int, initData bool) {
 		}(i)
 	}
 
-	//_, cancel := context.WithCancel(c.ctx)
+	time.Sleep(5 * time.Second)
 
-	/*var nemesisWg sync.WaitGroup
+	ctx, cancel := context.WithCancel(c.ctx)
+
+	var nemesisWg sync.WaitGroup
 	nemesisWg.Add(1)
 	go func() {
 		defer nemesisWg.Done()
-		c.dispatchNemesis(ctx)
-	}()*/
+		c.dispatchNemesis(ctx, nemesisNodes)
+	}()
 
 	clientWg.Wait()
 
-	//cancel()
+	cancel()
 
-	//nemesisWg.Wait()
+	nemesisWg.Wait()
 
 	//c.ShutdownClient()
 	//c.TearDownDB()
@@ -305,16 +306,20 @@ func (c *Controller) onClientLoop(i int) {
 	}
 }
 
-func (c *Controller) dispatchNemesis(ctx context.Context) {
+func (c *Controller) dispatchNemesis(ctx context.Context, ns []int) {
 	if len(c.nemesisGenerators) == 0 {
 		return
 	}
 
 	log.Printf("begin to run nemesis")
 	var wg sync.WaitGroup
-	n := len(c.nodes)
+	var nodes []string
+	for _, v := range ns {
+		nodes = append(nodes, c.nodes[v])
+	}
+
 LOOP:
-	for {
+	//for {
 		for _, g := range c.nemesisGenerators {
 			select {
 			case <-ctx.Done():
@@ -322,16 +327,17 @@ LOOP:
 			default:
 			}
 
-			log.Printf("begin to run %s nemesis generator", g.Name())
-			ops := g.Generate(c.nodes)
+			log.Printf("begin to run %s nemesis generator on nodes %v", g.Name(), nodes)
 
-			wg.Add(n)
-			for i := 0; i < n; i++ {
-				go c.onNemesisLoop(ctx, i, ops[i], &wg)
+			ops := g.Generate(nodes)
+
+			wg.Add(len(ops))
+			for i, op:= range ops {
+				go c.onNemesisLoop(ctx, ns[i], op, &wg)
 			}
 			wg.Wait()
 		}
-	}
+	//}
 	log.Printf("stop to run nemesis")
 }
 

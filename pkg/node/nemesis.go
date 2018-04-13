@@ -47,20 +47,22 @@ func (h *nemesisHandler) Run(w http.ResponseWriter, r *http.Request) {
 
 	node := r.FormValue("node")
 	invokeArgs := strings.Split(r.FormValue("invoke_args"), ",")
-	recoverArgs := strings.Split(r.FormValue("recover_args"), ",")
+	//recoverArgs := strings.Split(r.FormValue("recover_args"), ",")
 	runTime, _ := time.ParseDuration(r.FormValue("dur"))
 	if runTime == 0 {
 		runTime = time.Second * time.Duration(rand.Intn(10)+1)
 	}
 
-	log.Printf("invoke nemesis %s with %v on node %s", nemesis.Name(), invokeArgs, node)
+	log.Printf("invoke nemesis %s with %v on node %s runtime %d", nemesis.Name(),
+		invokeArgs, node, runTime)
 
-	defer func() {
+	//? why recover
+	/*defer func() {
 		log.Printf("recover nemesis %s with %v on node %s", nemesis.Name(), recoverArgs, node)
-		nemesis.Recover(h.agent.ctx, node, recoverArgs...)
-	}()
+		nemesis.Recover(h.agent.ctx, recoverArgs...)
+	}()*/
 
-	if err := nemesis.Invoke(h.agent.ctx, node, invokeArgs...); err != nil {
+	if err := nemesis.Invoke(h.agent.ctx, invokeArgs...); err != nil {
 		h.rd.JSON(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -69,6 +71,8 @@ func (h *nemesisHandler) Run(w http.ResponseWriter, r *http.Request) {
 	case <-h.agent.ctx.Done():
 	case <-time.After(runTime):
 	}
+
+	log.Printf("done nemesis %s running", nemesis.Name())
 
 	h.rd.JSON(w, http.StatusOK, nil)
 }

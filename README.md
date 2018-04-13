@@ -40,6 +40,9 @@ In another shell, use `docker exec -it chaos-control bash` to enter the controll
 /root/chaos-control -action starttidb -nodes 4
 # init tables and run, then linearization checking
 /root/chaos-control -action run -nodes 4 -initData
+
+#do minor_kill and linearization checking
+/root/chaos-control -action run -nodes 4,5 -initData -nemesis minor_kill -nemesis-nodes 1,2,3 -request-count 250
 ```
 
 

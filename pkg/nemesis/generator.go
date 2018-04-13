@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/siddontang/chaos/pkg/core"
+	"github.com/siddontang/chaos/tidb"
+	"math"
 )
 
 type killGenerator struct {
@@ -16,9 +18,9 @@ func (g killGenerator) Generate(nodes []string) []*core.NemesisOperation {
 	n := 1
 	switch g.name {
 	case "minor_kill":
-		n = len(nodes)/2 - 1
+		n = int(math.Floor(float64(len(nodes)) / float64(2)))
 	case "major_kill":
-		n = len(nodes)/2 + 1
+		n = int(math.Ceil(float64(len(nodes)) / float64(2)))
 	case "all_kill":
 		n = len(nodes)
 	default:
@@ -40,8 +42,9 @@ func killNodes(db string, nodes []string, n int) []*core.NemesisOperation {
 
 	for i := 0; i < n; i++ {
 		ops[indices[i]] = &core.NemesisOperation{
-			Name:        "kill",
-			InvokeArgs:  []string{db},
+			Name: "kill",
+			//TODO: Only kill kv now
+			InvokeArgs:  []string{db, tidb.SERVICE_TIKV},
 			RecoverArgs: []string{db},
 			RunTime:     time.Second * time.Duration(rand.Intn(10)+1),
 		}
@@ -102,12 +105,13 @@ func partitionNodes(nodes []string, n int) []*core.NemesisOperation {
 }
 
 func shuffleIndices(n int) []int {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	indices := make([]int, n)
 	for i := 0; i < n; i++ {
 		indices[i] = i
 	}
 	for i := len(indices) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
+		j := r.Intn(i + 1)
 		indices[i], indices[j] = indices[j], indices[i]
 	}
 

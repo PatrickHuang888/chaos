@@ -15,6 +15,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/siddontang/chaos/pkg/core"
 	"github.com/siddontang/chaos/pkg/history"
+	"log"
 )
 
 type bankClient struct {
@@ -39,10 +40,15 @@ func (c *bankClient) Setup(ctx context.Context, node string, initData bool) erro
 	}*/
 
 	if initData {
-		sql := `create table if not exists accounts
+		log.Printf("setting up init data on %s", node)
+		sql := `drop table if exists accounts`
+		if _, err = db.ExecContext(ctx, sql); err != nil {
+			return err
+		}
+
+		sql = `create table if not exists accounts
 			(id     int not null primary key,
 			balance bigint not null)`
-
 		if _, err = db.ExecContext(ctx, sql); err != nil {
 			return err
 		}
@@ -64,6 +70,7 @@ func (c *bankClient) Close(ctx context.Context, nodes []string, node string) err
 func (c *bankClient) invokeRead(ctx context.Context, r bankRequest) bankResponse {
 	rows, err := c.db.QueryContext(ctx, "select balance from accounts")
 	if err != nil {
+		log.Printf("query error %v", err)
 		return bankResponse{Unknown: true}
 	}
 	defer rows.Close()
@@ -72,6 +79,7 @@ func (c *bankClient) invokeRead(ctx context.Context, r bankRequest) bankResponse
 	for rows.Next() {
 		var v int64
 		if err = rows.Scan(&v); err != nil {
+			log.Printf("scan rows error %v", err)
 			return bankResponse{Unknown: true}
 		}
 		balances = append(balances, v)
@@ -89,6 +97,7 @@ func (c *bankClient) Invoke(ctx context.Context, node string, r interface{}) int
 	txn, err := c.db.Begin()
 
 	if err != nil {
+		log.Printf("tx begin error %v", err)
 		return bankResponse{Ok: false}
 	}
 	defer txn.Rollback()
@@ -98,10 +107,12 @@ func (c *bankClient) Invoke(ctx context.Context, node string, r interface{}) int
 		toBalance   int64
 	)
 	if err = txn.QueryRowContext(ctx, "select balance from accounts where id = ? for update", arg.From).Scan(&fromBalance); err != nil {
+		log.Printf("select from error %v", err)
 		return bankResponse{Ok: false}
 	}
 
 	if err = txn.QueryRowContext(ctx, "select balance from accounts where id = ? for update", arg.To).Scan(&toBalance); err != nil {
+		log.Printf("select to error %v", err)
 		return bankResponse{Ok: false}
 	}
 
@@ -110,14 +121,17 @@ func (c *bankClient) Invoke(ctx context.Context, node string, r interface{}) int
 	}
 
 	if _, err = txn.ExecContext(ctx, "update accounts set balance = balance - ? where id = ?", arg.Amount, arg.From); err != nil {
+		log.Printf("update from error %v", err)
 		return bankResponse{Ok: false}
 	}
 
 	if _, err = txn.ExecContext(ctx, "update accounts set balance = balance + ? where id = ?", arg.Amount, arg.To); err != nil {
+		log.Printf("update to error %v", err)
 		return bankResponse{Ok: false}
 	}
 
 	if err = txn.Commit(); err != nil {
+		log.Printf("commit error %v", err)
 		return bankResponse{Unknown: true}
 	}
 

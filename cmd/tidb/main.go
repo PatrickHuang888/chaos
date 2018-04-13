@@ -22,7 +22,7 @@ import (
 var (
 	action = flag.String("action", "run", "action:run, setupdb, "+
 		"startpd, startkv, starttidb, startclient, shutdownclient, killkv")
-	n            = flag.String("nodes", "-1", "nodes: 1,2,3,4, 5")
+	n            = flag.String("nodes", "", "nodes: 1,2,3,4, 5")
 	initData     = flag.Bool("initData", false, "if init data in database")
 	nodePort     = flag.Int("node-port", 8080, "node port")
 	requestCount = flag.Int("request-count", 500, "client test request count")
@@ -30,6 +30,7 @@ var (
 	clientCase   = flag.String("case", "bank", "client test case, like bank")
 	historyFile  = flag.String("history", "./history.log", "history file")
 	nemesises    = flag.String("nemesis", "", "nemesis, seperated by name, like random_kill,all_kill")
+	nn           = flag.String("nemesis-nodes", "", "nemesis-nodes: 1,2,3,4,5")
 )
 
 func main() {
@@ -44,7 +45,7 @@ func main() {
 	}
 
 	var (
-		creator core.ClientCreator
+		creator     core.ClientCreator
 		verifier    history.Verifier
 		nemesisGens []core.NemesisGenerator
 	)
@@ -79,7 +80,7 @@ func main() {
 	c := control.NewController(cfg, creator, nemesisGens)
 
 	var ns []int
-	if *n == "-1" {
+	if *n == "" {
 		ns = []int{}
 	} else {
 		nss := strings.Split(*n, ",")
@@ -89,6 +90,21 @@ func main() {
 				ns[i] = x
 			} else {
 				panic(fmt.Sprintf("node value error %s", v))
+			}
+		}
+	}
+
+	var nemesisNodes []int
+	if *nn == "" {
+		nemesisNodes = []int{}
+	} else {
+		ss := strings.Split(*nn, ",")
+		nemesisNodes = make([]int, len(ss))
+		for i, v := range ss {
+			if x, err := strconv.Atoi(v); err == nil {
+				nemesisNodes[i] = x
+			} else {
+				panic(fmt.Sprintf("nemesis-ndoes values error %s", ss))
 			}
 		}
 	}
@@ -123,8 +139,9 @@ func main() {
 		cancel()
 
 	case "run":
-		fmt.Printf("run client with initdata %v on %v\n", *initData, ns)
-		c.Run(ns, *initData)
+		fmt.Printf("run client with initdata %v on %v and nemesis %v\n", *initData, ns, nemesisNodes)
+
+		c.Run(ns, *initData, nemesisNodes)
 
 		// Verify may take a long time, we should quit ASAP if receive signal.
 		go func() {

@@ -15,9 +15,9 @@ type Nemesis interface {
 	// TearDown(ctx context.Context, node string) error
 
 	// Invoke executes the nemesis
-	Invoke(ctx context.Context, node string, args ...string) error
+	Invoke(ctx context.Context, args ...string) error
 	// Recover recovers the nemesis
-	Recover(ctx context.Context, node string, args ...string) error
+	Recover(ctx context.Context, args ...string) error
 	// Name returns the unique name for the nemesis
 	Name() string
 }
@@ -37,12 +37,12 @@ type NoopNemesis struct {
 // }
 
 // Invoke executes the nemesis
-func (NoopNemesis) Invoke(ctx context.Context, node string, args ...string) error {
+func (NoopNemesis) Invoke(ctx context.Context, args ...string) error {
 	return nil
 }
 
 // Recover recovers the nemesis
-func (NoopNemesis) Recover(ctx context.Context, node string, args ...string) error {
+func (NoopNemesis) Recover(ctx context.Context, args ...string) error {
 	return nil
 }
 

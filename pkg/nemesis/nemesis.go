@@ -9,14 +9,16 @@ import (
 
 type kill struct{}
 
-func (kill) Invoke(ctx context.Context, node string, args ...string) error {
+func (kill) Invoke(ctx context.Context, args ...string) error {
 	db := core.GetDB(args[0])
-	return db.Kill(ctx, node)
+	service := args[1]
+	return db.Kill(ctx, service)
 }
 
-func (kill) Recover(ctx context.Context, node string, args ...string) error {
+func (kill) Recover(ctx context.Context, args ...string) error {
 	db := core.GetDB(args[0])
-	return db.Start(ctx, node)
+	service := args[1]
+	return db.Start(ctx, service)
 }
 
 func (kill) Name() string {
@@ -27,12 +29,13 @@ type drop struct {
 	t net.IPTables
 }
 
-func (n drop) Invoke(ctx context.Context, node string, args ...string) error {
+func (n drop) Invoke(ctx context.Context, args ...string) error {
 	for _, dropNode := range args {
-		if node == dropNode {
+		//TODO:
+		/*if node == dropNode {
 			// Don't drop itself
 			continue
-		}
+		}*/
 
 		if err := n.t.Drop(ctx, dropNode); err != nil {
 			return err
@@ -41,7 +44,7 @@ func (n drop) Invoke(ctx context.Context, node string, args ...string) error {
 	return nil
 }
 
-func (n drop) Recover(ctx context.Context, node string, args ...string) error {
+func (n drop) Recover(ctx context.Context, args ...string) error {
 	return n.t.Heal(ctx)
 }
 

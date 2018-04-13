@@ -77,7 +77,7 @@ func (db *db) SetUp(ctx context.Context) error {
 	os.MkdirAll(path.Join(deployDir, "conf"), 0755)
 	os.MkdirAll(path.Join(deployDir, "log"), 0755)
 
-	if err := ioutil.WriteFile(pdConfig, []byte("[replication]\nmax-replicas=5"), 0644); err != nil {
+	if err := ioutil.WriteFile(pdConfig, []byte("[replication]\nmax-replicas=5\n[log]\nlevel = \"debug\""), 0644); err != nil {
 		log.Println("Write PD config file error.")
 		return err
 	}
@@ -320,6 +320,7 @@ func (db *db) Stop(ctx context.Context, service string) error {
 
 // Kill kills the database, default kill all
 func (db *db) Kill(ctx context.Context, service string) error {
+	log.Printf("kill service %s", service)
 
 	switch service {
 	case SERVICE_TIDB:
@@ -352,7 +353,19 @@ func (db *db) Kill(ctx context.Context, service string) error {
 
 // IsRunning checks whether the database is running or not
 func (db *db) IsRunning(ctx context.Context, service string) bool {
-	return util.IsDaemonRunning(ctx, tidbBinary, path.Join(deployDir, "tidb.pid"))
+	var s string
+	switch service {
+	case SERVICE_TIDB:
+		s = "tidb.pid"
+	case SERVICE_PD:
+		s = "pd.pid"
+	case SERVICE_TIKV:
+		s = "tikv.pid"
+	default:
+		log.Printf("[IsRunning]service %s not recognized", service)
+		return false
+	}
+	return util.IsDaemonRunning(ctx, tidbBinary, path.Join(deployDir, s))
 }
 
 // Name returns the unique name for the database
